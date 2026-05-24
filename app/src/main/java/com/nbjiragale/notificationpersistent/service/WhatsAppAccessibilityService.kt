@@ -1,7 +1,6 @@
 package com.nbjiragale.notificationpersistent.service
 
 import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.nbjiragale.notificationpersistent.data.db.AppDatabase
@@ -18,6 +17,10 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+// Configuration (event types, package filter, canRetrieveWindowContent) is declared
+// in res/xml/accessibility_service_config.xml. We intentionally do NOT override
+// serviceInfo here — doing so would drop canRetrieveWindowContent and break
+// rootInActiveWindow traversal.
 class WhatsAppAccessibilityService : AccessibilityService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -31,24 +34,6 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         super.onCreate()
         repo = MessageRepository(AppDatabase.getInstance(applicationContext))
         settings = AppSettings(applicationContext)
-    }
-
-    override fun onServiceConnected() {
-        super.onServiceConnected()
-        val info = AccessibilityServiceInfo().apply {
-            eventTypes = (
-                AccessibilityEvent.TYPE_VIEW_CLICKED or
-                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-            )
-            packageNames = WhatsAppNotificationListener.WHATSAPP_PACKAGES.toTypedArray()
-            feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
-            flags = (
-                AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
-                AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
-            )
-            notificationTimeout = 100
-        }
-        serviceInfo = info
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -118,6 +103,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
                 MessageEntity(
                     conversationId = convId,
                     notificationKey = null,
+                    dedupKey = null,
                     direction = Direction.SENT,
                     content = content,
                     mediaType = mediaType,

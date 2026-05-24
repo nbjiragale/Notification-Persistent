@@ -2,7 +2,6 @@ package com.nbjiragale.notificationpersistent.data.repository
 
 import com.nbjiragale.notificationpersistent.data.db.*
 import kotlinx.coroutines.flow.Flow
-import java.util.Calendar
 
 class MessageRepository(private val db: AppDatabase) {
 
@@ -29,12 +28,15 @@ class MessageRepository(private val db: AppDatabase) {
                 isGroup = isGroup
             )
         )
-        // IGNORE conflict means insert returns -1 if duplicate race — re-query
+        // OnConflictStrategy.IGNORE returns -1 on a race; re-query the winner.
         if (newId == -1L) {
             return db.conversationDao().findByName(contactName)?.id ?: -1L
         }
         return newId
     }
+
+    suspend fun existsByDedupKey(dedupKey: String): Boolean =
+        db.messageDao().findByDedupKey(dedupKey) != null
 
     suspend fun insertMessage(message: MessageEntity): Long {
         val id = db.messageDao().insert(message)

@@ -10,6 +10,7 @@ import com.nbjiragale.notificationpersistent.data.repository.MessageRepository
 import com.nbjiragale.notificationpersistent.data.settings.AppSettings
 import com.nbjiragale.notificationpersistent.service.ListenerForegroundService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -34,9 +35,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (enabled) ListenerForegroundService.start(ctx) else ListenerForegroundService.stop(ctx)
     }
 
-    fun observeMessages(conversationId: Long): StateFlow<List<MessageEntity>> =
+    // Cold flow — collected inside repeatOnLifecycle, so it is cancelled with the view.
+    fun observeMessages(conversationId: Long): Flow<List<MessageEntity>> =
         repo.observeMessages(conversationId)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun setConversationMonitored(id: Long, monitored: Boolean) = viewModelScope.launch {
         repo.setConversationMonitored(id, monitored)

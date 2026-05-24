@@ -16,12 +16,14 @@ interface MessageDao {
     """)
     suspend fun getForContactSince(contactName: String, sinceMs: Long): List<MessageEntity>
 
-    @Query("SELECT id FROM messages WHERE notificationKey = :key AND direction = 'INCOMING' AND replyStatus = 'PENDING' LIMIT 1")
-    suspend fun findPendingByKey(key: String): Long?
+    @Query("SELECT id FROM messages WHERE dedupKey = :dedupKey LIMIT 1")
+    suspend fun findByDedupKey(dedupKey: String): Long?
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(entity: MessageEntity): Long
 
+    // Marks every still-pending incoming message of a conversation slot as resolved
+    // (REPLIED when WhatsApp cleared the notification, DISMISSED when swiped away).
     @Query("UPDATE messages SET replyStatus = :status, removalReason = :reason WHERE notificationKey = :key AND direction = 'INCOMING' AND replyStatus = 'PENDING'")
     suspend fun markReplied(key: String, status: ReplyStatus, reason: Int): Int
 

@@ -17,34 +17,36 @@ import java.util.Locale
 
 class DailyBackupReceiver : BroadcastReceiver() {
 
+    // Alarm fires on the main thread; do DB + SMS work off-thread via goAsync().
     override fun onReceive(context: Context, intent: Intent) {
-        val settings = AppSettings(context)
-        val backupNumber = settings.backupNumberBlocking() ?: return
-        val backupContact = settings.backupContactBlocking() ?: return
-        if (backupNumber.isBlank() || backupContact.isBlank()) return
-
-        val midnight = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-
-        val messages = runBlocking {
-            AppDatabase.getInstance(context)
-                .messageDao()
-                .getForContactSince(backupContact, midnight)
-        }
-
-        if (messages.isNotEmpty()) {
-            sendSmsBackup(context, backupNumber, backupContact, messages)
-        }
-
-        // Reschedule for same time tomorrow
-        DailyBackupScheduler(context).scheduleFor(
-            settings.backupHourBlocking(),
-            settings.backupMinuteBlocking()
-        )
+        val pending = goAsync()
+        val app = context.applicationContext
+        Thread {
+            try {
+                val settings = AppSettings(app)
+                val number = settings.backupNumberBlocking()
+                val contact = settings.backupContactBlocking()
+                if (!number.isNullOrBlank() && !contact.isNullOrBlank()) {
+                    val midnight = Calendar.getInstance().apply {
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }.timeInMillis
+                    val messages = runBlocking {
+                        AppDatabase.getInstance(app).messageDao().getForContactSince(contact, midnight)
+                    }
+                    if (messages.isNotEmpty()) sendSmsBackup(app, number, contact, messages)
+                }
+                // Re-arm for the same time tomorrow.
+                DailyBackupScheduler(app).scheduleFor(
+                    settings.backupHourBlocking(),
+                    settings.backupMinuteBlocking()
+                )
+            } finally {
+                pending.finish()
+            }
+        }.start()
     }
 
     private fun sendSmsBackup(

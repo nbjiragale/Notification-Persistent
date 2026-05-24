@@ -13,13 +13,18 @@ import androidx.room.PrimaryKey
         childColumns = ["conversationId"],
         onDelete = ForeignKey.CASCADE
     )],
-    indices = [Index("conversationId"), Index("notificationKey")]
+    indices = [Index("conversationId"), Index("notificationKey"), Index("dedupKey")]
 )
 data class MessageEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val conversationId: Long,
+    // The conversation notification slot (StatusBarNotification.key). Used to mark
+    // all pending incoming messages of a chat as replied when WhatsApp clears it.
     val notificationKey: String?,
+    // Per-message unique key (slot|timestamp|texthash) to avoid duplicate inserts
+    // when WhatsApp re-posts the same MessagingStyle history. Null for SENT messages.
+    val dedupKey: String? = null,
     val direction: Direction,
     val content: String,
     val mediaType: MediaType = MediaType.TEXT,
